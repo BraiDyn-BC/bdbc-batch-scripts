@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Ryo Aoki and Shoya Sugimoto
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 import re
 from pathlib import Path
@@ -11,12 +33,13 @@ import bdbc_nwb_tools as nwbtools
 file_matcher = re.compile(r'([a-zA-Z0-9-]+)_([0-9-]+)_(task|resting-state|sensory-stim)-day([0-9]+)')
 type_indexer = ['task', 'resting-state', 'sensory-stim']
 
+
 def sanity_check_nwb(nwb_path,
-                     output_txt_path = None,
-                     isResting = False,
-                     isSensory = False
+                     output_txt_path=None,
+                     isResting=False,
+                     isSensory=False
                      ) -> None:
-    
+
     # load the nwb file and print summary
     assert os.path.exists(nwb_path), f'File not found: {nwb_path}'
 
@@ -27,33 +50,34 @@ def sanity_check_nwb(nwb_path,
                                       downsampled=True,
                                       isResting=isResting,
                                       isSensory=isSensory)
- 
+
     if isSensory:
         df_name_list = ['rois',]
-    else: 
+    else:
         df_name_list = ['rois',
                         'daq',
                         'body_video_tracking',
                         'face_video_tracking',
                         'eye_video_tracking',
                         'pupil_tracking']
-    
+
     with open(output_txt_path, 'w') as f:
         for df_name in df_name_list:
             summary = stat_summary(session, df_name, nwb_path)
             f.write(f"\n\n\n{df_name.upper()} summary\n")
-            f.write(summary.to_string(index=True, header = True))
+            f.write(summary.to_string(index=True, header=True))
 
-def stat_summary(session:nwbtools.NWBData, df_name, nwb_path, verbose = True):
+
+def stat_summary(session: nwbtools.NWBData, df_name, nwb_path, verbose=True):
     tab = getattr(session, df_name)
-    if tab is None: 
+    if tab is None:
         if verbose:
             print(f"***no {df_name} found in {nwb_path}")
             print()
         return None
     summary = tab.describe().T
     summary = summary[['mean', 'std', 'min', 'max']]
-    summary['nan_count'] = tab.isna().sum() 
+    summary['nan_count'] = tab.isna().sum()
     if verbose:
         print(f"{df_name} summary for {nwb_path}")
         print(summary)
@@ -68,7 +92,7 @@ def nwb_file_indexer(filepath: Path) -> tuple[str, str, str, int]:
     return (matches.group(1), matches.group(2), type_indexer.index(matches.group(3)), int(matches.group(4)))
 
 
-def plot_summary_within_animal(folder_path, output_folder = None):
+def plot_summary_within_animal(folder_path, output_folder=None):
     assert os.path.exists(folder_path)
     folder_name = str(folder_path).split(os.path.sep)[-1]  # animal name
 
@@ -82,18 +106,19 @@ def plot_summary_within_animal(folder_path, output_folder = None):
     for nwb_file, isResting, isSensory in zip(nwb_files, isRestings, isSensorys):
         print(f"loading {nwb_file}")
         sessions.append(nwbtools.load_from_file(nwb_file,
-                                                downsampled = True,
-                                                isResting = isResting,
-                                                isSensory = isSensory
+                                                downsampled=True,
+                                                isResting=isResting,
+                                                isSensory=isSensory
                                                 ))
 
     df_name_list = [
-                            'daq',
-                            'body_video_tracking',
-                            'face_video_tracking',
-                            'eye_video_tracking',
-                            'pupil_tracking', 'rois',]
-
+        'daq',
+        'body_video_tracking',
+        'face_video_tracking',
+        'eye_video_tracking',
+        'pupil_tracking',
+        'rois',
+    ]
 
     for df_name in df_name_list:
         if output_folder is None:
@@ -104,15 +129,15 @@ def plot_summary_within_animal(folder_path, output_folder = None):
         file_names = [nwb_file.name for nwb_file in nwb_files]
 
         if df_name == 'rois':
-            plot_stats_across_sessions(file_names, sessions, png_path_base = png_path_base, df_name = df_name)
+            plot_stats_across_sessions(file_names, sessions, png_path_base=png_path_base, df_name=df_name)
 
-        else: # sensory data should be omitted
+        else:  # sensory data should be omitted
             nwb_files_no_sensory = [nwb_file for nwb_file, isSensory in zip(file_names, isSensorys) if not isSensory]
             sessions_no_sensory = [session for session, isSensory in zip(sessions, isSensorys) if not isSensory]
-            plot_stats_across_sessions(nwb_files_no_sensory, sessions_no_sensory, png_path_base = png_path_base, df_name = df_name)
+            plot_stats_across_sessions(nwb_files_no_sensory, sessions_no_sensory, png_path_base=png_path_base, df_name=df_name)
 
 
-def plot_stats_across_sessions(nwb_files, sessions, png_path_base = None, df_name = 'rois'):
+def plot_stats_across_sessions(nwb_files, sessions, png_path_base=None, df_name='rois'):
 
     summarys = []  # each item having shape (num_features, num_stats)
     rows = None  # corresponds to the types of the features to be plotted
@@ -123,21 +148,21 @@ def plot_stats_across_sessions(nwb_files, sessions, png_path_base = None, df_nam
             if rows is None:
                 rows = summary.index
 
-    nRow = int(len(rows)/2) if df_name == 'rois' else len(rows)
+    nRow = int(len(rows) / 2) if df_name == 'rois' else len(rows)
 
     maxRow = 10
-    nCol = 5 # mean, max, min, std, nan
+    nCol = 5  # mean, max, min, std, nan
 
     stats = ['mean', 'max', 'min', 'std', 'nan_count']
 
     fig = plt.figure(figsize=(12, 15), facecolor='w')
-    gs = gridspec.GridSpec(maxRow+2, nCol, figure=fig)
+    gs = gridspec.GridSpec(maxRow + 2, nCol, figure=fig)
 
     for i in range(nRow):
         iRow = i % maxRow
         if df_name == 'rois':
-            # left 
-            row_name = rows[i][:-2] 
+            # left
+            row_name = rows[i][:-2]
 
             selected_row_l = [df.loc[f"{row_name}_l"] for df in summarys]  # does not have to take None's into account (b/c it is from imaging data)
             result_l = pd.concat(selected_row_l, axis=0)
@@ -174,19 +199,19 @@ def plot_stats_across_sessions(nwb_files, sessions, png_path_base = None, df_nam
                     ax.set_ylabel(row_name)
                 if iRow == 0:
                     ax.set_title(stat)
-            
-        if i % maxRow == maxRow-1 or i == nRow-1:
-            #add text
-            textlist = [f"{i} : {j}" for i, j in enumerate(nwb_files)]
-            numline = len(textlist)//2 + 1
-            for j in range(2):
-                text_part = "\n".join(textlist[j*numline:(j+1)*numline])
-                ax_text = fig.add_subplot(gs[-2:, j*2:(j+1)*2])
-                ax_text.axis('off')
-                ax_text.text(0.05, 0.95, text_part, transform=ax_text.transAxes, fontsize=11,
-                        verticalalignment='top', bbox=dict(facecolor='w', alpha=0.5),
-                        )
 
+        if i % maxRow == (maxRow - 1) or i == (nRow - 1):
+            # add text
+            textlist = [f"{i} : {j}" for i, j in enumerate(nwb_files)]
+            numline = len(textlist) // 2 + 1
+            for j in range(2):
+                text_part = "\n".join(textlist[(j * numline):((j + 1) * numline)])
+                ax_text = fig.add_subplot(gs[-2:, (j * 2):((j + 1) * 2)])
+                ax_text.axis('off')
+                ax_text.text(
+                    0.05, 0.95, text_part, transform=ax_text.transAxes, fontsize=11,
+                    verticalalignment='top', bbox=dict(facecolor='w', alpha=0.5),
+                )
 
             plt.tight_layout()
             png_path = f"{png_path_base}_{(i // maxRow) + 1:02d}.png"
@@ -201,7 +226,7 @@ def plot_stats_across_sessions(nwb_files, sessions, png_path_base = None, df_nam
 
             # create new figure again
             fig = plt.figure(figsize=(12, 15), facecolor='w')
-            gs = gridspec.GridSpec(maxRow+2, 5, figure=fig)
+            gs = gridspec.GridSpec(maxRow + 2, 5, figure=fig)
     plt.close(fig)
 
 
